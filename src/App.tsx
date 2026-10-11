@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Bell,
@@ -112,7 +112,7 @@ function catalogErrorMessage(message: string) {
   return message;
 }
 
-function EmptyState({ title, message, action }: { title: string; message: string; action?: string }) {
+function EmptyState({ title, message, action, onAction }: { title: string; message: string; action?: string; onAction?: () => void }) {
   return (
     <div className="empty-state">
       <div className="empty-icon"><CircleHelp size={18} /></div>
@@ -120,7 +120,7 @@ function EmptyState({ title, message, action }: { title: string; message: string
         <strong>{title}</strong>
         <p>{message}</p>
       </div>
-      {action && <button className="text-button">{action}</button>}
+      {action && onAction && <button className="text-button" onClick={onAction}>{action}</button>}
     </div>
   );
 }
@@ -133,44 +133,48 @@ function App() {
   const [catalogItems, setCatalogItems] = useState<ApiCatalogRecord[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(isSupabaseConfigured);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadCatalog() {
-      if (!supabase) {
-        setCatalogLoading(false);
-        setCatalogError('Supabase is not configured for this environment.');
-        return;
-      }
-
-      setCatalogLoading(true);
-      setCatalogError(null);
-      const { data, error } = await supabase
-        .from('api_catalog')
-        .select('id,name,slug,description,category,documentation_url,website_url,pricing_type,authentication_type,metadata_status,is_public')
-        .eq('is_public', true)
-        .order('name', { ascending: true });
-
-      if (ignore) {
-        return;
-      }
-
-      if (error) {
-        setCatalogItems([]);
-        setCatalogError(catalogErrorMessage(error.message));
-      } else {
-        setCatalogItems((data ?? []) as ApiCatalogRecord[]);
-      }
+  const loadCatalog = useCallback(async () => {
+    if (!supabase) {
       setCatalogLoading(false);
+      setCatalogError('Supabase is not configured for this environment.');
+      return;
     }
 
-    void loadCatalog();
+    setCatalogLoading(true);
+    setCatalogError(null);
+    const { data, error } = await supabase
+      .from('api_catalog')
+      .select('id,name,slug,description,category,documentation_url,website_url,pricing_type,authentication_type,metadata_status,is_public')
+      .eq('is_public', true)
+      .order('name', { ascending: true });
 
-    return () => {
-      ignore = true;
-    };
+    if (error) {
+      setCatalogItems([]);
+      setCatalogError(catalogErrorMessage(error.message));
+    } else {
+      setCatalogItems((data ?? []) as ApiCatalogRecord[]);
+    }
+    setCatalogLoading(false);
   }, []);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setNotice(null), 3500);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    document.title = darkMode ? 'DevHub AI (dark preview)' : 'DevHub AI';
+  }, [darkMode]);
 
   const catalogCategories = useMemo(() => {
     return ['All', ...Array.from(new Set(catalogItems.map((item) => item.category))).sort()];
@@ -200,7 +204,8 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${darkMode ? 'dark-preview' : ''}`}>
+      {notice && <div className="toast" role="status">{notice}</div>}
       {sidebarOpen && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
@@ -232,11 +237,11 @@ function App() {
           </div>
         </nav>
 
-        <div className="sidebar-footer">
+        <button className="sidebar-footer" onClick={() => setNotice('Workspace switching will be available with multi-workspace support')}>
           <div className="workspace-avatar">W</div>
           <div><strong>Personal workspace</strong><small>Free plan</small></div>
           <ChevronDown size={15} />
-        </div>
+        </button>
       </aside>
 
       <div className="content-area">
@@ -249,9 +254,9 @@ function App() {
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search workspace" aria-label="Search workspace" />
               <kbd>Ctrl K</kbd>
             </label>
-            <button className="icon-button" aria-label="Toggle theme"><Moon size={17} /></button>
-            <button className="icon-button notification-button" aria-label="Notifications"><Bell size={17} /><span /></button>
-            <div className="profile-avatar" aria-label="User profile">L</div>
+            <button className="icon-button" aria-label="Toggle theme" title="Toggle theme" onClick={() => setDarkMode((current) => !current)}><Moon size={17} /></button>
+            <button className="icon-button notification-button" aria-label="Notifications" title="Notifications" onClick={() => setNotice('No new notifications')}><Bell size={17} /><span /></button>
+            <button className="profile-avatar" aria-label="Open user profile" title="User profile" onClick={() => setNotice('Profile settings are not available until authentication is enabled')}>L</button>
           </div>
         </header>
 
@@ -289,7 +294,7 @@ function App() {
                 <div><h2>Usage overview</h2><p>Requests and tokens over time</p></div>
                 <select aria-label="Usage date range" defaultValue="30"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>
               </div>
-              <EmptyState title="No usage data yet" message="Connect a provider and send a request to see usage trends here." action="Connect provider" />
+              <EmptyState title="No usage data yet" message="Connect a provider and send a request to see usage trends here." action="Connect provider" onAction={() => navigate('#accounts')} />
             </article>
 
             <article id="accounts" className="surface-card">
@@ -323,7 +328,7 @@ function App() {
             </div>
             {catalogLoading && <EmptyState title="Loading API catalog" message="Retrieving catalog records from Supabase." />}
             {!catalogLoading && catalogError && (
-              <EmptyState title="Catalog unavailable" message={catalogError} />
+              <EmptyState title="Catalog unavailable" message={catalogError} action="Retry" onAction={() => void loadCatalog()} />
             )}
             {!catalogLoading && !catalogError && filteredCatalog.length === 0 && (
               <EmptyState
@@ -362,6 +367,19 @@ function App() {
             <div><Sparkles size={18} /><strong>AI Workspace</strong><p>Select a verified model and connected provider to start a conversation.</p></div>
             <button className="secondary-button" onClick={() => navigate('#accounts')}>Manage connections</button>
           </section>
+
+          {[
+            ['agents', 'AI Agents', 'Agent configuration is not available until the agent execution service is connected.'],
+            ['subscriptions', 'Subscriptions', 'Subscription verification will appear here when a supported provider account is connected.'],
+            ['usage', 'Usage Monitor', 'Usage records will appear here after a provider request is completed.'],
+            ['settings', 'Workspace Settings', 'Workspace settings require authentication and a selected workspace.'],
+            ['preferences', 'Preferences', 'User preferences require authentication.'],
+          ].map(([id, title, message]) => (
+            <section id={id} className="surface-card module-placeholder" key={id}>
+              <h2>{title}</h2>
+              <p>{message}</p>
+            </section>
+          ))}
         </main>
       </div>
     </div>

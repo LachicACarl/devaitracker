@@ -29,7 +29,7 @@ button { cursor: pointer; }
 .nav-group-label { padding: 0 12px 7px; color: #64748b; font-size: .67rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
 .sidebar-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 7px; color: #94a3b8; font-size: .84rem; font-weight: 600; transition: background .15s, color .15s; }
 .sidebar-nav a:hover, .sidebar-nav a:focus-visible, .sidebar-nav a.active { color: #fff; background: rgba(37, 99, 235, .28); outline: none; }
-.sidebar-footer { display: flex; align-items: center; gap: 9px; margin-top: auto; padding: 14px 9px 0; border-top: 1px solid rgba(148, 163, 184, .16); }
+.sidebar-footer { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: auto; padding: 14px 9px 0; color: inherit; text-align: left; border: 0; border-top: 1px solid rgba(148, 163, 184, .16); background: transparent; }
 .workspace-avatar, .profile-avatar { display: grid; place-items: center; border-radius: 50%; font-weight: 700; }
 .workspace-avatar { width: 28px; height: 28px; color: #bfdbfe; background: #1e3a8a; font-size: .75rem; }
 .sidebar-footer > svg { margin-left: auto; color: #64748b; }
@@ -93,6 +93,11 @@ select { padding: 7px 26px 7px 9px; color: #475569; border: 1px solid var(--bord
 .pricing-label { color: #475569; font-size: .7rem; }
 .catalog-row > a { color: var(--muted); }
 .workspace-placeholder { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; padding: 18px 19px; color: #1e3a8a; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; }
+.module-placeholder { margin-top: 14px; }
+.module-placeholder p { margin-top: 5px; color: var(--muted); font-size: .8rem; }
+.toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; max-width: 360px; padding: 11px 14px; color: #fff; border-radius: 8px; background: #1e293b; box-shadow: 0 10px 30px rgba(15, 23, 42, .2); font-size: .78rem; }
+.dark-preview { filter: saturate(.9); }
+.dark-preview .content-area { background: #f1f5f9; }
 .workspace-placeholder > div { display: grid; grid-template-columns: 22px 1fr; column-gap: 8px; align-items: center; }
 .workspace-placeholder p { grid-column: 2; margin-top: 3px; color: #475569; font-size: .75rem; }
 
