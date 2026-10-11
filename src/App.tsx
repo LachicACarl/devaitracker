@@ -1,350 +1,259 @@
-type Stat = {
+import { useMemo, useState } from 'react';
+import {
+  Activity,
+  Bell,
+  Bot,
+  Boxes,
+  CheckCircle2,
+  ChevronDown,
+  CircleHelp,
+  Code2,
+  Database,
+  ExternalLink,
+  Gauge,
+  LayoutDashboard,
+  Menu,
+  Moon,
+  PlugZap,
+  Search,
+  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Users,
+  X,
+} from 'lucide-react';
+
+type Icon = typeof LayoutDashboard;
+
+type NavItem = {
   label: string;
-  value: string;
-  note: string;
-};
-
-type ApiCard = {
-  name: string;
-  category: string;
-  status: string;
-  description: string;
-  latency: string;
-};
-
-type ModelCard = {
-  name: string;
-  provider: string;
-  mode: string;
-  cost: string;
-  availability: string;
+  href: string;
+  icon: Icon;
 };
 
 type Provider = {
   name: string;
   kind: string;
-  status: string;
-  plan: string;
+  status: 'Not connected' | 'Available';
+  capabilities: string[];
 };
 
-const stats: Stat[] = [
-  { label: 'Connected APIs', value: '128', note: '+18 this month' },
-  { label: 'AI models', value: '24', note: '7 active workspaces' },
-  { label: 'Accounts', value: '6', note: '2 team-linked' },
-  { label: 'Usage spend', value: '$1,240', note: '12.4% under budget' },
-];
-
-const apiCards: ApiCard[] = [
+const navGroups: { label: string; items: NavItem[] }[] = [
   {
-    name: 'GitHub API',
-    category: 'Developer Tools',
-    status: 'Healthy',
-    description: 'Repository metadata, issue sync, and workflow automation.',
-    latency: '240 ms',
+    label: 'Workspace',
+    items: [
+      { label: 'Overview', href: '#overview', icon: LayoutDashboard },
+      { label: 'AI Workspace', href: '#workspace', icon: Sparkles },
+    ],
   },
   {
-    name: 'Stripe',
-    category: 'Payments',
-    status: 'Healthy',
-    description: 'Billing events and subscription state monitoring for teams.',
-    latency: '180 ms',
+    label: 'Discover',
+    items: [
+      { label: 'API Hub', href: '#api-hub', icon: Boxes },
+      { label: 'AI Models', href: '#models', icon: Bot },
+      { label: 'AI Agents', href: '#agents', icon: Code2 },
+    ],
   },
   {
-    name: 'OpenAI',
-    category: 'AI Models',
-    status: 'Burst ready',
-    description: 'Model access, token tracking, and rate-limit controls.',
-    latency: '350 ms',
+    label: 'Manage',
+    items: [
+      { label: 'Connected Accounts', href: '#accounts', icon: PlugZap },
+      { label: 'Subscriptions', href: '#subscriptions', icon: ShieldCheck },
+      { label: 'Usage Monitor', href: '#usage', icon: Activity },
+    ],
   },
-  {
-    name: 'PubNub',
-    category: 'Realtime',
-    status: 'Watching',
-    description: 'Events, notifications, and collaborative agent updates.',
-    latency: '95 ms',
-  },
-];
-
-const modelCards: ModelCard[] = [
-  { name: 'GPT-4o', provider: 'OpenAI', mode: 'Chat + Vision', cost: '$0.06 / 1K tokens', availability: 'Available' },
-  { name: 'Claude 3.5 Sonnet', provider: 'Anthropic', mode: 'Reasoning', cost: '$0.08 / 1K tokens', availability: 'Available' },
-  { name: 'Gemini 1.5 Pro', provider: 'Google', mode: 'Long context', cost: '$0.04 / 1K tokens', availability: 'Queued' },
-  { name: 'Llama 3.1 70B', provider: 'Together AI', mode: 'Open model', cost: '$0.03 / 1K tokens', availability: 'Available' },
 ];
 
 const providers: Provider[] = [
-  { name: 'GitHub', kind: 'Source code', status: 'Connected', plan: 'Team Pro' },
-  { name: 'OpenAI', kind: 'Model access', status: 'Connected', plan: 'Usage-based' },
-  { name: 'Anthropic', kind: 'Reasoning models', status: 'Connecting', plan: 'Trial' },
-  { name: 'Supabase', kind: 'Postgres + Auth', status: 'Connected', plan: 'Pro' },
+  { name: 'OpenAI', kind: 'AI models', status: 'Not connected', capabilities: ['Text', 'Vision'] },
+  { name: 'Anthropic', kind: 'AI models', status: 'Not connected', capabilities: ['Text', 'Reasoning'] },
+  { name: 'Google Gemini', kind: 'AI models', status: 'Not connected', capabilities: ['Text', 'Long context'] },
 ];
 
-const usageBars = [72, 91, 64, 84, 58, 76, 88];
+const catalog = [
+  { name: 'GitHub API', category: 'Developer tools', pricing: 'Unknown pricing', auth: 'OAuth / token' },
+  { name: 'Stripe API', category: 'Payments', pricing: 'Paid API', auth: 'API key' },
+  { name: 'Supabase', category: 'Infrastructure', pricing: 'Free tier available', auth: 'API key' },
+];
+
+function EmptyState({ title, message, action }: { title: string; message: string; action?: string }) {
+  return (
+    <div className="empty-state">
+      <div className="empty-icon"><CircleHelp size={18} /></div>
+      <div>
+        <strong>{title}</strong>
+        <p>{message}</p>
+      </div>
+      {action && <button className="text-button">{action}</button>}
+    </div>
+  );
+}
 
 function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeHref, setActiveHref] = useState('#overview');
+  const [search, setSearch] = useState('');
+  const [catalogFilter, setCatalogFilter] = useState('All');
+
+  const filteredCatalog = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return catalog.filter((item) => {
+      const matchesTerm = !term || `${item.name} ${item.category}`.toLowerCase().includes(term);
+      const matchesFilter = catalogFilter === 'All' || item.category === catalogFilter;
+      return matchesTerm && matchesFilter;
+    });
+  }, [catalogFilter, search]);
+
+  const navigate = (href: string) => {
+    setActiveHref(href);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {sidebarOpen && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-mark">D</div>
-          <div>
-            <strong>DevHub AI</strong>
-            <small>Developer tools, connected</small>
-          </div>
+          <div><strong>DevHub AI</strong><small>Developer platform</small></div>
+          <button className="mobile-close" aria-label="Close navigation" onClick={() => setSidebarOpen(false)}><X size={18} /></button>
         </div>
 
         <nav className="sidebar-nav" aria-label="Main navigation">
-          <a href="#api-hub">API Hub</a>
-          <a href="#workspace">AI Workspace</a>
-          <a href="#accounts">Accounts</a>
-          <a href="#usage">Usage Monitor</a>
+          {navGroups.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-group-label">{group.label}</span>
+              {group.items.map(({ label, href, icon: NavIcon }) => (
+                <a
+                  className={activeHref === href ? 'active' : ''}
+                  href={href}
+                  key={href}
+                  onClick={() => navigate(href)}
+                >
+                  <NavIcon size={16} aria-hidden="true" /> {label}
+                </a>
+              ))}
+            </div>
+          ))}
+          <div className="nav-group">
+            <span className="nav-group-label">Settings</span>
+            <a href="#settings" onClick={() => navigate('#settings')}><Settings size={16} aria-hidden="true" /> Workspace settings</a>
+            <a href="#preferences" onClick={() => navigate('#preferences')}><SlidersHorizontal size={16} aria-hidden="true" /> Preferences</a>
+          </div>
         </nav>
 
         <div className="sidebar-footer">
-          <span className="status-dot" />
-          <div>
-            <strong>All systems healthy</strong>
-            <small>Free-first workspace</small>
-          </div>
+          <div className="workspace-avatar">W</div>
+          <div><strong>Personal workspace</strong><small>Free plan</small></div>
+          <ChevronDown size={15} />
         </div>
       </aside>
 
       <div className="content-area">
         <header className="topbar">
-          <div>
-            <span className="eyebrow">Workspace overview</span>
-            <h1>Good afternoon, developer.</h1>
+          <button className="mobile-menu" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
+          <div className="breadcrumbs"><span>Workspace</span><span>/</span><strong>Overview</strong></div>
+          <div className="topbar-actions">
+            <label className="global-search">
+              <Search size={16} aria-hidden="true" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search workspace" aria-label="Search workspace" />
+              <kbd>⌘ K</kbd>
+            </label>
+            <button className="icon-button" aria-label="Toggle theme"><Moon size={17} /></button>
+            <button className="icon-button notification-button" aria-label="Notifications"><Bell size={17} /><span /></button>
+            <div className="profile-avatar" aria-label="User profile">L</div>
           </div>
-          <button className="primary-button">Launch dashboard</button>
         </header>
 
         <main>
-        <section className="hero">
-          <div className="hero-copy">
-            <span className="eyebrow">Free-first platform</span>
-            <h1>One unified developer platform for APIs, models, and usage.</h1>
-            <p>
-              Discover tools, connect provider accounts, monitor quotas, and manage AI work in one shared dashboard.
-            </p>
-
-            <div className="hero-actions">
-              <button className="primary-button">Get started</button>
-              <button className="secondary-button">View architecture</button>
+          <section id="overview" className="page-heading">
+            <div>
+              <span className="eyebrow">Workspace overview</span>
+              <h1>Overview</h1>
+              <p>Monitor your AI tools, connected providers, and usage in one place.</p>
             </div>
-
-            <div className="hero-pills">
-              <span>Marketplace</span>
-              <span>Workbench</span>
-              <span>Usage tracking</span>
+            <div className="heading-actions">
+              <button className="secondary-button" onClick={() => navigate('#models')}><Bot size={16} /> Explore models</button>
+              <button className="primary-button" onClick={() => navigate('#accounts')}><PlugZap size={16} /> Connect provider</button>
             </div>
-          </div>
+          </section>
 
-          <div className="hero-panel">
-            <div className="panel-header">
-              <span className="status-dot" />
-              Platform health
-            </div>
+          <section className="summary-grid" aria-label="Workspace summary">
+            {[
+              { label: 'Connected providers', icon: PlugZap, value: '—', note: 'Connect an account to get started' },
+              { label: 'Available models', icon: Bot, value: '—', note: 'Requires provider metadata' },
+              { label: 'API requests', icon: Activity, value: '—', note: 'No usage records yet' },
+              { label: 'Usage cost', icon: Gauge, value: '—', note: 'No cost data available' },
+            ].map(({ label, icon: SummaryIcon, value, note }) => (
+              <article className="summary-card" key={label}>
+                <div className="summary-card-top"><span>{label}</span><SummaryIcon size={17} /></div>
+                <strong>{value}</strong>
+                <small>{note}</small>
+              </article>
+            ))}
+          </section>
 
-            <div className="chart">
-              {usageBars.map((value, index) => (
-                <div key={index} className="bar-group">
-                  <div className="bar" style={{ height: `${value}%` }} />
-                </div>
-              ))}
-            </div>
-
-            <div className="metric-grid">
-              <div>
-                <small>Requests</small>
-                <strong>1.4M</strong>
+          <section className="overview-grid">
+            <article className="surface-card usage-overview">
+              <div className="section-header">
+                <div><h2>Usage overview</h2><p>Requests and tokens over time</p></div>
+                <select aria-label="Usage date range" defaultValue="30"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>
               </div>
-              <div>
-                <small>Active agents</small>
-                <strong>38</strong>
-              </div>
-              <div>
-                <small>Avg. latency</small>
-                <strong>268 ms</strong>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="stats-grid">
-          {stats.map((stat) => (
-            <article key={stat.label} className="stat-card">
-              <span>{stat.label}</span>
-              <strong>{stat.value}</strong>
-              <small>{stat.note}</small>
+              <EmptyState title="No usage data yet" message="Connect a provider and send a request to see usage trends here." action="Connect provider" />
             </article>
-          ))}
-        </section>
 
-        <section id="api-hub" className="content-block">
-          <div className="section-header">
-            <div>
-              <span className="eyebrow">API Hub</span>
-              <h2>Discover and test APIs</h2>
-            </div>
-            <a href="#">Browse catalog</a>
-          </div>
-
-          <div className="card-grid">
-            {apiCards.map((api) => (
-              <article key={api.name} className="feature-card">
-                <div className="feature-header">
-                  <div>
-                    <strong>{api.name}</strong>
-                    <small>{api.category}</small>
+            <article id="accounts" className="surface-card">
+              <div className="section-header"><div><h2>Connected providers</h2><p>Manage your provider connections</p></div><a href="#accounts">View all</a></div>
+              <div className="provider-list">
+                {providers.map((provider) => (
+                  <div className="provider-row" key={provider.name}>
+                    <div className="provider-logo">{provider.name.slice(0, 1)}</div>
+                    <div className="provider-info"><strong>{provider.name}</strong><small>{provider.kind} · {provider.capabilities.join(' / ')}</small></div>
+                    <span className="status-tag neutral">{provider.status}</span>
                   </div>
-                  <span className="pill success">{api.status}</span>
-                </div>
-                <p>{api.description}</p>
-                <div className="meta-row">
-                  <span>Latency</span>
-                  <strong>{api.latency}</strong>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section id="workspace" className="content-block">
-          <div className="section-header">
-            <div>
-              <span className="eyebrow">AI Workspace</span>
-              <h2>Models and agent runs</h2>
-            </div>
-            <a href="#">Open workspace</a>
-          </div>
-
-          <div className="card-grid models-grid">
-            {modelCards.map((model) => (
-              <article key={model.name} className="feature-card compact">
-                <div className="feature-header">
-                  <div>
-                    <strong>{model.name}</strong>
-                    <small>{model.provider}</small>
-                  </div>
-                  <span className="pill neutral">{model.availability}</span>
-                </div>
-                <div className="meta-stack">
-                  <span>{model.mode}</span>
-                  <strong>{model.cost}</strong>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section id="accounts" className="content-block split-layout">
-          <div>
-            <div className="section-header narrow">
-              <div>
-                <span className="eyebrow">Accounts</span>
-                <h2>Personal and team connections</h2>
-              </div>
-            </div>
-
-            <div className="provider-list">
-              {providers.map((provider) => (
-                <div key={provider.name} className="provider-row">
-                  <div>
-                    <strong>{provider.name}</strong>
-                    <small>{provider.kind}</small>
-                  </div>
-                  <span className="status-tag">{provider.status}</span>
-                  <span className="plan-tag">{provider.plan}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="data-card">
-            <h3>Platform principles</h3>
-            <ul>
-              <li>One shared interface over multiple independent providers.</li>
-              <li>Provider adapters keep integrations isolated and replaceable.</li>
-              <li>Usage data and account state remain auditable and secure.</li>
-            </ul>
-          </div>
-        </section>
-
-        <section id="usage" className="content-block">
-          <div className="section-header">
-            <div>
-              <span className="eyebrow">Usage Monitor</span>
-              <h2>Requests, quotas and costs</h2>
-            </div>
-            <a href="#">Download report</a>
-          </div>
-
-          <div className="usage-layout">
-            <div className="usage-card">
-              <div className="usage-header-row">
-                <span>Monthly spend</span>
-                <strong>$1,240</strong>
-              </div>
-              <div className="mini-bars" aria-label="Monthly usage chart">
-                {[35, 48, 62, 39, 71, 84, 90].map((value, index) => (
-                  <span key={index} style={{ height: `${value}%` }} />
                 ))}
               </div>
-            </div>
+              <button className="outline-full-button" onClick={() => navigate('#accounts')}><PlugZap size={16} /> Connect a provider</button>
+            </article>
+          </section>
 
-            <div className="usage-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Provider</th>
-                    <th>Usage</th>
-                    <th>Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>OpenAI</td>
-                    <td>41%</td>
-                    <td>$480</td>
-                  </tr>
-                  <tr>
-                    <td>Anthropic</td>
-                    <td>28%</td>
-                    <td>$290</td>
-                  </tr>
-                  <tr>
-                    <td>GitHub</td>
-                    <td>16%</td>
-                    <td>$160</td>
-                  </tr>
-                  <tr>
-                    <td>Other APIs</td>
-                    <td>15%</td>
-                    <td>$310</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+          <section className="surface-card activity-card">
+            <div className="section-header"><div><h2>Recent activity</h2><p>Requests from connected providers</p></div><a href="#usage">Usage monitor</a></div>
+            <EmptyState title="No recent activity" message="Your completed AI requests will appear here with provider, model, timing, and cost details." />
+          </section>
 
-        <section className="content-block architecture-block">
-          <div className="section-header">
-            <div>
-              <span className="eyebrow">System architecture</span>
-              <h2>Modular and provider-agnostic</h2>
+          <section id="api-hub" className="surface-card catalog-card">
+            <div className="section-header">
+              <div><span className="eyebrow">Discover</span><h2>API Hub</h2><p>Explore developer APIs with transparent metadata.</p></div>
+              <div className="catalog-controls">
+                <select aria-label="Filter API catalog" value={catalogFilter} onChange={(event) => setCatalogFilter(event.target.value)}>
+                  <option>All</option><option>Developer tools</option><option>Payments</option><option>Infrastructure</option>
+                </select>
+              </div>
             </div>
-          </div>
+            <div className="catalog-list">
+              {filteredCatalog.map((item) => (
+                <div className="catalog-row" key={item.name}>
+                  <div className="catalog-icon"><Database size={17} /></div>
+                  <div><strong>{item.name}</strong><small>{item.category} · {item.auth}</small></div>
+                  <span className="metadata-badge">Unverified metadata</span>
+                  <span className="pricing-label">{item.pricing}</span>
+                  <a href="#api-hub" aria-label={`Open ${item.name} details`}><ExternalLink size={16} /></a>
+                </div>
+              ))}
+            </div>
+          </section>
 
-          <div className="architecture-grid">
-            <div className="architecture-item">Frontend</div>
-            <div className="architecture-item">Dashboard</div>
-            <div className="architecture-item">Provider adapters</div>
-            <div className="architecture-item">API gateway</div>
-            <div className="architecture-item">Usage engine</div>
-            <div className="architecture-item">Supabase</div>
-          </div>
-        </section>
+          <section id="models" className="surface-card models-card">
+            <div className="section-header"><div><span className="eyebrow">Discover</span><h2>AI Models</h2><p>Model availability will appear after provider metadata is synchronized.</p></div><button className="secondary-button" onClick={() => navigate('#workspace')}><Sparkles size={16} /> Open workspace</button></div>
+            <EmptyState title="No verified models available" message="Connect a provider or synchronize the catalog to view model capabilities and pricing." />
+          </section>
+
+          <section id="workspace" className="workspace-placeholder">
+            <div><Sparkles size={18} /><strong>AI Workspace</strong><p>Select a verified model and connected provider to start a conversation.</p></div>
+            <button className="secondary-button" onClick={() => navigate('#accounts')}>Manage connections</button>
+          </section>
         </main>
       </div>
     </div>
