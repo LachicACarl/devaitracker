@@ -108,6 +108,9 @@ function App() {
   const navigate = (href: string) => {
     setActiveHref(href);
     setSidebarOpen(false);
+    window.requestAnimationFrame(() => {
+      document.querySelector(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   return (
