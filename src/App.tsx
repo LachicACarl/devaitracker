@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Bell,
   Bot,
   Boxes,
-  CheckCircle2,
   ChevronDown,
   CircleHelp,
   Code2,
@@ -20,9 +19,9 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Users,
   X,
 } from 'lucide-react';
+import { isSupabaseConfigured, supabase } from './lib/supabase';
 
 type Icon = typeof LayoutDashboard;
 
@@ -37,6 +36,20 @@ type Provider = {
   kind: string;
   status: 'Not connected' | 'Available';
   capabilities: string[];
+};
+
+type ApiCatalogRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  category: string;
+  documentation_url: string | null;
+  website_url: string | null;
+  pricing_type: 'free' | 'trial' | 'paid' | 'open_source' | 'unknown';
+  authentication_type: string | null;
+  metadata_status: 'verified' | 'unverified' | 'stale';
+  is_public: boolean;
 };
 
 const navGroups: { label: string; items: NavItem[] }[] = [
@@ -71,11 +84,33 @@ const providers: Provider[] = [
   { name: 'Google Gemini', kind: 'AI models', status: 'Not connected', capabilities: ['Text', 'Long context'] },
 ];
 
-const catalog = [
-  { name: 'GitHub API', category: 'Developer tools', pricing: 'Unknown pricing', auth: 'OAuth / token' },
-  { name: 'Stripe API', category: 'Payments', pricing: 'Paid API', auth: 'API key' },
-  { name: 'Supabase', category: 'Infrastructure', pricing: 'Free tier available', auth: 'API key' },
-];
+const pricingLabels: Record<ApiCatalogRecord['pricing_type'], string> = {
+  free: 'Free',
+  trial: 'Trial available',
+  paid: 'Paid API',
+  open_source: 'Open source',
+  unknown: 'Unknown pricing',
+};
+
+const metadataLabels: Record<ApiCatalogRecord['metadata_status'], string> = {
+  verified: 'Verified',
+  unverified: 'Unverified metadata',
+  stale: 'Needs review',
+};
+
+function catalogErrorMessage(message: string) {
+  const lowerMessage = message.toLowerCase();
+  if (lowerMessage.includes('permission') || lowerMessage.includes('row-level security') || lowerMessage.includes('403')) {
+    return 'Catalog records are not readable with the current permissions.';
+  }
+  if (lowerMessage.includes('failed to fetch') || lowerMessage.includes('network')) {
+    return 'The catalog could not be reached. Check the network and Supabase project configuration.';
+  }
+  if (lowerMessage.includes('could not find the table') || lowerMessage.includes('schema cache')) {
+    return 'The catalog table is missing. Apply the reviewed Supabase migrations first.';
+  }
+  return message;
+}
 
 function EmptyState({ title, message, action }: { title: string; message: string; action?: string }) {
   return (
@@ -95,15 +130,66 @@ function App() {
   const [activeHref, setActiveHref] = useState('#overview');
   const [search, setSearch] = useState('');
   const [catalogFilter, setCatalogFilter] = useState('All');
+  const [catalogItems, setCatalogItems] = useState<ApiCatalogRecord[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(isSupabaseConfigured);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadCatalog() {
+      if (!supabase) {
+        setCatalogLoading(false);
+        setCatalogError('Supabase is not configured for this environment.');
+        return;
+      }
+
+      setCatalogLoading(true);
+      setCatalogError(null);
+      const { data, error } = await supabase
+        .from('api_catalog')
+        .select('id,name,slug,description,category,documentation_url,website_url,pricing_type,authentication_type,metadata_status,is_public')
+        .eq('is_public', true)
+        .order('name', { ascending: true });
+
+      if (ignore) {
+        return;
+      }
+
+      if (error) {
+        setCatalogItems([]);
+        setCatalogError(catalogErrorMessage(error.message));
+      } else {
+        setCatalogItems((data ?? []) as ApiCatalogRecord[]);
+      }
+      setCatalogLoading(false);
+    }
+
+    void loadCatalog();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const catalogCategories = useMemo(() => {
+    return ['All', ...Array.from(new Set(catalogItems.map((item) => item.category))).sort()];
+  }, [catalogItems]);
 
   const filteredCatalog = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return catalog.filter((item) => {
-      const matchesTerm = !term || `${item.name} ${item.category}`.toLowerCase().includes(term);
+    return catalogItems.filter((item) => {
+      const searchable = [
+        item.name,
+        item.category,
+        item.description,
+        item.authentication_type,
+      ].filter(Boolean).join(' ').toLowerCase();
+      const matchesTerm = !term || searchable.includes(term);
       const matchesFilter = catalogFilter === 'All' || item.category === catalogFilter;
       return matchesTerm && matchesFilter;
     });
-  }, [catalogFilter, search]);
+  }, [catalogFilter, catalogItems, search]);
 
   const navigate = (href: string) => {
     setActiveHref(href);
@@ -161,7 +247,7 @@ function App() {
             <label className="global-search">
               <Search size={16} aria-hidden="true" />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search workspace" aria-label="Search workspace" />
-              <kbd>⌘ K</kbd>
+              <kbd>Ctrl K</kbd>
             </label>
             <button className="icon-button" aria-label="Toggle theme"><Moon size={17} /></button>
             <button className="icon-button notification-button" aria-label="Notifications"><Bell size={17} /><span /></button>
@@ -184,10 +270,10 @@ function App() {
 
           <section className="summary-grid" aria-label="Workspace summary">
             {[
-              { label: 'Connected providers', icon: PlugZap, value: '—', note: 'Connect an account to get started' },
-              { label: 'Available models', icon: Bot, value: '—', note: 'Requires provider metadata' },
-              { label: 'API requests', icon: Activity, value: '—', note: 'No usage records yet' },
-              { label: 'Usage cost', icon: Gauge, value: '—', note: 'No cost data available' },
+              { label: 'Connected providers', icon: PlugZap, value: '-', note: 'Connect an account to get started' },
+              { label: 'Available models', icon: Bot, value: '-', note: 'Requires provider metadata' },
+              { label: 'API requests', icon: Activity, value: '-', note: 'No usage records yet' },
+              { label: 'Usage cost', icon: Gauge, value: '-', note: 'No cost data available' },
             ].map(({ label, icon: SummaryIcon, value, note }) => (
               <article className="summary-card" key={label}>
                 <div className="summary-card-top"><span>{label}</span><SummaryIcon size={17} /></div>
@@ -212,7 +298,7 @@ function App() {
                 {providers.map((provider) => (
                   <div className="provider-row" key={provider.name}>
                     <div className="provider-logo">{provider.name.slice(0, 1)}</div>
-                    <div className="provider-info"><strong>{provider.name}</strong><small>{provider.kind} · {provider.capabilities.join(' / ')}</small></div>
+                    <div className="provider-info"><strong>{provider.name}</strong><small>{provider.kind} / {provider.capabilities.join(' / ')}</small></div>
                     <span className="status-tag neutral">{provider.status}</span>
                   </div>
                 ))}
@@ -231,21 +317,40 @@ function App() {
               <div><span className="eyebrow">Discover</span><h2>API Hub</h2><p>Explore developer APIs with transparent metadata.</p></div>
               <div className="catalog-controls">
                 <select aria-label="Filter API catalog" value={catalogFilter} onChange={(event) => setCatalogFilter(event.target.value)}>
-                  <option>All</option><option>Developer tools</option><option>Payments</option><option>Infrastructure</option>
+                  {catalogCategories.map((category) => <option key={category}>{category}</option>)}
                 </select>
               </div>
             </div>
-            <div className="catalog-list">
-              {filteredCatalog.map((item) => (
-                <div className="catalog-row" key={item.name}>
-                  <div className="catalog-icon"><Database size={17} /></div>
-                  <div><strong>{item.name}</strong><small>{item.category} · {item.auth}</small></div>
-                  <span className="metadata-badge">Unverified metadata</span>
-                  <span className="pricing-label">{item.pricing}</span>
-                  <a href="#api-hub" aria-label={`Open ${item.name} details`}><ExternalLink size={16} /></a>
-                </div>
-              ))}
-            </div>
+            {catalogLoading && <EmptyState title="Loading API catalog" message="Retrieving catalog records from Supabase." />}
+            {!catalogLoading && catalogError && (
+              <EmptyState title="Catalog unavailable" message={catalogError} />
+            )}
+            {!catalogLoading && !catalogError && filteredCatalog.length === 0 && (
+              <EmptyState
+                title={catalogItems.length === 0 ? 'No APIs in the catalog' : 'No matching APIs'}
+                message={catalogItems.length === 0 ? 'Apply the database migration and add catalog records to show APIs here.' : 'Adjust search or category filters to broaden the results.'}
+              />
+            )}
+            {!catalogLoading && !catalogError && filteredCatalog.length > 0 && (
+              <div className="catalog-list">
+                {filteredCatalog.map((item) => (
+                  <div className="catalog-row" key={item.id}>
+                    <div className="catalog-icon"><Database size={17} /></div>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <small>{item.category} / {item.authentication_type ?? 'Auth unknown'}</small>
+                    </div>
+                    <span className={`metadata-badge metadata-${item.metadata_status}`}>{metadataLabels[item.metadata_status]}</span>
+                    <span className="pricing-label">{pricingLabels[item.pricing_type]}</span>
+                    {item.documentation_url || item.website_url ? (
+                      <a href={item.documentation_url ?? item.website_url ?? undefined} aria-label={`Open ${item.name} documentation`} target="_blank" rel="noreferrer"><ExternalLink size={16} /></a>
+                    ) : (
+                      <span className="catalog-link-placeholder" aria-hidden="true" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section id="models" className="surface-card models-card">

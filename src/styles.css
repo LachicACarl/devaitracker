@@ -83,6 +83,9 @@ select { padding: 7px 26px 7px 9px; color: #475569; border: 1px solid var(--bord
 .provider-info small, .catalog-row small { display: block; margin-top: 2px; color: var(--muted); font-size: .68rem; }
 .status-tag, .metadata-badge { padding: 4px 7px; border-radius: 5px; font-size: .65rem; font-weight: 700; white-space: nowrap; }
 .status-tag.neutral, .metadata-badge { color: #64748b; background: #f1f5f9; }
+.metadata-verified { color: #047857; background: #d1fae5; }
+.metadata-stale { color: #92400e; background: #fef3c7; }
+.catalog-link-placeholder { width: 18px; height: 18px; }
 .outline-full-button { width: 100%; margin-top: 18px; padding: 9px; color: var(--blue); background: #fff; border: 1px solid #bfdbfe; }
 .activity-card, .catalog-card, .models-card { margin-top: 14px; }
 .catalog-list { display: flex; flex-direction: column; }

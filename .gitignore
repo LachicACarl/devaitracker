@@ -10,3 +10,4 @@ vite.config.d.ts
 apps/api/.venv/
 __pycache__/
 .pytest_cache/
+supabase/.temp/

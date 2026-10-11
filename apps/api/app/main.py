@@ -2,6 +2,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .database_readiness import check_database_readiness
 
 settings = get_settings()
 api_router = APIRouter(prefix=settings.api_prefix)
@@ -14,6 +15,11 @@ async def health_check() -> dict[str, str]:
         "service": settings.app_name,
         "version": settings.app_version,
     }
+
+
+@api_router.get("/readiness/database", tags=["health"])
+async def database_readiness() -> dict:
+    return await check_database_readiness(settings)
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
