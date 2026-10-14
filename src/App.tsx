@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CircleHelp,
   Code2,
+  Cpu,
   Database,
   ExternalLink,
   Gauge,
@@ -22,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
+import ElectronicsExplorer from './ElectronicsExplorer';
 
 type Icon = typeof LayoutDashboard;
 
@@ -64,6 +66,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: 'Discover',
     items: [
       { label: 'API Hub', href: '#api-hub', icon: Boxes },
+      { label: 'Electronics Explorer', href: '#electronics-explorer', icon: Cpu },
       { label: 'AI Models', href: '#models', icon: Bot },
       { label: 'AI Agents', href: '#agents', icon: Code2 },
     ],
@@ -357,6 +360,8 @@ function App() {
               </div>
             )}
           </section>
+
+          <ElectronicsExplorer />
 
           <section id="models" className="surface-card models-card">
             <div className="section-header"><div><span className="eyebrow">Discover</span><h2>AI Models</h2><p>Model availability will appear after provider metadata is synchronized.</p></div><button className="secondary-button" onClick={() => navigate('#workspace')}><Sparkles size={16} /> Open workspace</button></div>
